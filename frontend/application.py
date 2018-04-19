@@ -1,99 +1,114 @@
-# author: oskar.blom@gmail.com
-#
-# Make sure your gevent version is >= 1.0
-import gevent
-from gevent.wsgi import WSGIServer
-from gevent.queue import Queue
-
-from flask import Flask, Response
-
-import time
-
-
-# SSE "protocol" is described here: http://mzl.la/UPFyxY
-class ServerSentEvent(object):
-
-    def __init__(self, data):
-        self.data = data
-        self.event = None
-        self.id = None
-        self.desc_map = {
-            self.data : "data",
-            self.event : "event",
-            self.id : "id"
-        }
-
-    def encode(self):
-        if not self.data:
-            return ""
-        lines = ["%s: %s" % (v, k) 
-                 for k, v in self.desc_map.iteritems() if k]
-        
-        return "%s\n\n" % "\n".join(lines)
+from flask import Flask, render_template, request, make_response
+from frontend.localization import get_localization_strings
+from flask.ext.babel import format_datetime
+from datetime import datetime
+from flask.ext.babel import gettext, ngettext
 
 app = Flask(__name__)
-subscriptions = []
+app.config.from_pyfile('frontend.cfg')
 
-# Client code consumes like this.
-@app.route("/")
+from flask import g, request
+from flask_babel import Babel
+
+babel = Babel(app)
+
+
+@babel.localeselector
+def get_locale():
+	# if a user is logged in, use the locale from the user settings
+	user = getattr(g, 'user', None)
+	if user is not None:
+		return user.locale
+	# otherwise try to guess the language from the user accept
+	# header the browser transmits.  We support de/fr/en in this
+	# example.  The best match wins.
+	return request.accept_languages.best_match(['de', 'fr', 'en'])
+
+
+@babel.timezoneselector
+def get_timezone():
+	user = getattr(g, 'user', None)
+	if user is not None:
+		return user.timezone
+
+
+@app.route('/translator')
+def translator():
+	return '<br>'.join((
+		gettext(u'A simple string'),
+		gettext(u'Value: %(value)s', value=42),
+		ngettext(u'%(num)s Apple', u'%(num)s Apples', 59)
+	))
+
+
+@app.route('/current-date')
+def current_date():
+	return '<br>'.join((
+		format_datetime(datetime.now()),
+		format_datetime(datetime.now(), 'full'),
+		format_datetime(datetime.now(), 'short')
+	))
+
+
+@app.route('/getcookie')
+def getcookie():
+	name = request.cookies.get('userID')
+	return '<h1>welcome ' + name + '</h1>'
+
+
+@app.route('/setcookie', methods=['POST', 'GET'])
+def setcookie():
+	resp = make_response(render_template('readcookie.html'))
+	if request.method == 'POST':
+		user = request.form['nm']
+		resp.set_cookie('userID', user)
+
+	return resp
+
+
+@app.route('/')
 def index():
-    debug_template = """
-     <html>
-       <head>
-       </head>
-       <body>
-         <h1>Server sent events</h1>
-         <div id="event"></div>
-         <script type="text/javascript">
+	return render_template(
+		"index.html",
+		username="Username",
+		logged_in=False,
+		**get_localization_strings()
+	)
 
-         var eventOutputContainer = document.getElementById("event");
-         var evtSrc = new EventSource("/subscribe");
 
-         evtSrc.onmessage = function(e) {
-             console.log(e.data);
-             eventOutputContainer.innerHTML = e.data;
-         };
+@app.route('/profile')
+def profile():
+	return render_template(
+		"index.html",
+		username="Username",
+		logged_in=False,
+		**get_localization_strings()
+	)
 
-         </script>
-       </body>
-     </html>
-    """
-    return(debug_template)
 
-@app.route("/debug")
-def debug():
-    return "Currently %d subscriptions" % len(subscriptions)
+@app.route('/login.html')
+@app.route('/login')
+def login():
+	return render_template(
+		"login.html",
+		**get_localization_strings()
+	)
 
-@app.route("/publish")
-def publish():
-    #Dummy data - pick up from request for real data
-    def notify():
-        msg = str(time.time())
-        for sub in subscriptions[:]:
-            sub.put(msg)
-    
-    gevent.spawn(notify)
-    
-    return "OK"
 
-@app.route("/subscribe")
-def subscribe():
-    def gen():
-        q = Queue()
-        subscriptions.append(q)
-        try:
-            while True:
-                result = q.get()
-                ev = ServerSentEvent(str(result))
-                yield ev.encode()
-        except GeneratorExit: # Or maybe use flask signals
-            subscriptions.remove(q)
+@app.route('/simulation.html')
+@app.route('/simulation')
+def simulation():
+	return render_template(
+		"simulation.html",
+		**get_localization_strings()
+	)
 
-    return Response(gen(), mimetype="text/event-stream")
+
+@app.route('/link')
+def mylink():
+	return repr(request.accept_languages)
+
 
 if __name__ == "__main__":
-    app.debug = True
-    server = WSGIServer(("", 5000), app)
-    server.serve_forever()
-    # Then visit http://localhost:5000 to subscribe 
-    # and send messages by visiting http://localhost:5000/publish
+	app.debug = True
+	app.run(port=5000, debug=True)

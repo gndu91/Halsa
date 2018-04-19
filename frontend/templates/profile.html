@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href={{ url_for('static', filename="styles.css") }}>
+<link rel="stylesheet" href={{ url_for('static', filename="login.css") }}>
+<link rel="stylesheet" href={{ url_for('static', filename="modal_login_formal.css") }}>
+
+
+</head>
+<body>
+
+
+<div class="tab">
+  <button class="tablinks" onclick="openCity(event, 'My Account')">My Account</button>
+  <button class="tablinks" onclick="openCity(event, 'Register')">Register</button>
+  <button class="tablinks" onclick="openCity(event, 'Tokyo')">Tokyo</button>
+</div>
+
+<div id="My Account" class="tabcontent">
+    {% if logged_in %}
+        <h3>{{ username }}</h3>
+        <p>London is the capital city of England.</p>
+    {% else %}
+        <h3>You are not logged in</h3>
+        {% include "modal_login_form.html" %}
+        <button class="button" onclick="document.getElementById('modal_login_form').style.display='block'">
+            <span>Login</span>
+        </button>
+        <script src="{{ url_for('static', filename='modal_login_form.js') }}"></script>
+        <button class="button"><span>Sign Up</span></button>
+    {% endif %}
+</div>
+
+
+
+<div id="Register" class="tabcontent">
+  <h3>Register</h3>
+  <p>Register is the capital of France.</p>
+</div>
+
+<div id="Tokyo" class="tabcontent">
+  <h3>Tokyo</h3>
+  <p>Tokyo is the capital of Japan.</p>
+</div>
+
+<script>
+function openCity(evt, cityName) {
+    var i, tabcontent, tablinks;
+    tabcontent = document.getElementsByClassName("tabcontent");
+    for (i = 0; i < tabcontent.length; i++) {
+        tabcontent[i].style.display = "none";
+    }
+    tablinks = document.getElementsByClassName("tablinks");
+    for (i = 0; i < tablinks.length; i++) {
+        tablinks[i].className = tablinks[i].className.replace(" active", "");
+    }
+    document.getElementById(cityName).style.display = "block";
+    evt.currentTarget.className += " active";
+}
+</script>
+
+</body>
+</html>
